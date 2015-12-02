@@ -1,6 +1,15 @@
-#Puma to CBSA allocation table
-###################################
-#Generate a correspondence file to allocate PUMAs (PUMA "2012") to the most-recent Core Based Statistical Areas (CBSA: Core Based (Metro/Micro-politan) Statistical Area - 2013) using the MABLE/Geocorr12 tool: http://mcdc.missouri.#edu/websas/geocorr12.html. The correspondence will not be neat in many cases but our standard approach is to include all PUMAs that are all or partially within each metro area as being part of that metro. What this means is that the #approximations of CBSAs will sometimes be larger in area and population than the actual CBSAs. If any PUMAs end up falling partially within two or more metro areas, include the PUMA in the metro that is shares the most population with and #note any such cases for our records.
+#Puma to CBSA allocation table  Generate a correspondence file to allocate
+#PUMAs (PUMA "2012") to the most-recent Core Based Statistical Areas (CBSA:
+#Core Based (Metro/Micro-politan) Statistical Area - 2013) using the
+#MABLE/Geocorr12 tool: http://mcdc.missouri.edu/websas/geocorr12.html. The
+#correspondence will not be neat in many cases but our standard approach is to
+#include all PUMAs that are all or partially within each metro area as being
+#part of that metro. What this means is that the approximations of CBSAs will
+#sometimes be larger in area and population than the actual CBSAs. If any
+#PUMAs end up falling partially within two or more metro areas, include the
+#PUMA in the metro that is shares the most population with and note any such
+#cases for our records.
+
 PUMA12tocbsa13 <- read.csv("N:/Disconnected Youth Work/2015 Report Work/ACS PUMS/PUMA12tocbsa13.txt")
 P2C<-(PUMA12tocbsa13)
 colnames(P2C)
@@ -10,5 +19,40 @@ colnames(P2C)
 newdata <- P2C[ which(P2C$afact !='1' & P2C$cbsa != ' '),]
 
 # so "newdata" is an object that has only pumas with partial allocation to cbsa
+# what I want to do next is if a puma12 value repeats, then compare the values
+# of the corresponding afact. Take the afact with the highest value and
+# allocate a 1 in a dummy variable. Only dummies with a 1 will have a cbsa
+# assignment
 
-# what I want to do next is if a puma12 value repeats, then compare the values of the corresponding afact. Take the afact with the highest value and allocate a 1 in a dummy variable. Only dummies with a 1 will have a cbsa assignment
+
+#andy
+#instead of removing pumas that are completely allocated to one cbsa and that don't belong to a CBSA, we are just going to remove pumas that don't belong to any CBSA.
+
+
+cbsa_a_p <- subset(P2C, P2C$cbsa != "")
+
+#cbsa_a_p = cbsa all or partial. 
+
+#now to create the dummy variable for those PUMAs that are entirely encapsulated by a CBSA
+
+cbsa_a_p$dummy <- ifelse(cbsa_a_p$afact == 1, c("1"), c("0"))
+
+#now to deal with MSAs that are divided by three or more
+
+cbsa_just_partial <- subset(cbsa_a_p, cbsa_a_p$dummy == 0)
+
+#subset of whole pumas for later
+cbsa_whole <- subset(cbsa_a_p, cbsa_a_p$dummy == 1)
+
+#using the dplyr package will be very helpful
+
+library(dplyr)
+df_greatest_percentage_of_puma_in_cbsa <- cbsa_just_partial %>% group_by(stab,puma12,PUMAname) %>% summarise(afact = max(afact))
+
+#now to merge back CBSA numbers to this new partial dataset
+
+duplicates_removed_with_cbsa <-merge(x = df_greatest_percentage_of_puma_in_cbsa, y = cbsa_just_partial, all.x= TRUE)
+
+#now to merge pumas back with the whole pumas
+
+pumas_for_analysis <- merge(x = duplicates_removed_with_cbsa, y = cbsa_whole, all = TRUE)
